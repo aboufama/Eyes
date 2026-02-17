@@ -10,6 +10,11 @@
     background: #000; height: 100vh; display: flex; align-items: center; justify-content: center;
     cursor: default; overflow: hidden;
   }
+  #mobile-msg { display: none; color: #fff; font-family: serif; font-size: 18px; text-align: center; padding: 40px; }
+  @media (max-width: 768px) {
+    #mobile-msg { display: block; }
+    #canvas, #title, #paper-texture { display: none !important; }
+  }
   #canvas { position: relative; }
   #canvas img { position: absolute; user-select: none; -webkit-user-drag: none; display: none; }
   #title { position: fixed; bottom: 80px; left: 0; right: 0; text-align: center; font-family: serif; font-size: 28px; color: #fff; letter-spacing: 0.3em; pointer-events: none; }
@@ -22,6 +27,7 @@
 </head>
 <body>
 
+<div id="mobile-msg">Please view on a larger display.</div>
 <div id="canvas"></div>
 <div id="title">LIGHT</div>
 <canvas id="paper-texture"></canvas>
