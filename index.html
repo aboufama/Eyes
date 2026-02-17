@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eye Animation</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000; height: 100vh; display: flex; align-items: center; justify-content: center;
+    cursor: default; overflow: hidden;
+  }
+  #canvas { position: relative; }
+  #canvas img { position: absolute; user-select: none; -webkit-user-drag: none; display: none; }
+  #title { position: fixed; bottom: 80px; left: 0; right: 0; text-align: center; font-family: serif; font-size: 28px; color: #fff; letter-spacing: 0.3em; pointer-events: none; }
+
+  #paper-texture {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 10; opacity: 0;
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas"></div>
+<div id="title">LIGHT</div>
+<canvas id="paper-texture"></canvas>
+
+<script>
+// ===== Paper texture =====
+const texCanvas = document.getElementById('paper-texture');
+const texCtx = texCanvas.getContext('2d');
+
+function drawPaperTexture() {
+  texCanvas.width = window.innerWidth;
+  texCanvas.height = window.innerHeight;
+  const w = texCanvas.width, h = texCanvas.height;
+  const imgData = texCtx.createImageData(w, h);
+  const d = imgData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const px = (i / 4) % w;
+    const py = Math.floor((i / 4) / w);
+    const noise = (Math.random() - 0.5) * 18;
+    const fiber = Math.sin(px * 0.8 + py * 0.3) * 3 + Math.sin(py * 1.2 + px * 0.1) * 2;
+    const base = 245;
+    d[i]     = Math.max(0, Math.min(255, base + noise + fiber + 3));
+    d[i + 1] = Math.max(0, Math.min(255, base + noise + fiber + 1));
+    d[i + 2] = Math.max(0, Math.min(255, base + noise + fiber - 2));
+    d[i + 3] = 40;
+  }
+  texCtx.putImageData(imgData, 0, 0);
+  for (let i = 0; i < 200; i++) {
+    const x = Math.random() * w, y = Math.random() * h;
+    const len = Math.random() * 30 + 5, angle = Math.random() * Math.PI;
+    texCtx.strokeStyle = `rgba(${200+Math.random()*30},${195+Math.random()*30},${185+Math.random()*30},${Math.random()*0.06})`;
+    texCtx.lineWidth = Math.random() * 1.5 + 0.5;
+    texCtx.beginPath();
+    texCtx.moveTo(x, y);
+    texCtx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+    texCtx.stroke();
+  }
+}
+drawPaperTexture();
+window.addEventListener('resize', drawPaperTexture);
+
+// ===== Animation =====
+const FRAMES = [
+  { src: 'Eye1.png', x: 7, y: -36, scale: 1 },
+  { src: 'Eye2.png', x: 8, y: -33, scale: 1 },
+  { src: 'Eye3.png', x: 29, y: -31, scale: 1.05 },
+  { src: 'Eye4.png', x: 8, y: -37, scale: 1 },
+  { src: 'Eye5.png', x: -15, y: -40, scale: 1 },
+  { src: 'Eye6.png', x: -19, y: -40, scale: 1 },
+  { src: 'Eye7.png', x: -15, y: -35, scale: 1 },
+  { src: 'Eye8.png', x: 25, y: -39, scale: 1.05 },
+  { src: 'Eye9.png', x: 31, y: -36, scale: 1.05 }
+];
+
+const total = FRAMES.length;
+const eyeCanvas = document.getElementById('canvas');
+let imgElements = [];
+let playing = false;
+let animTimer = null;
+let bgTimer = null;
+let currentT = 0;
+let gazeColor = 0;
+
+function getFilter(t) {
+  const inv = 1 - t;
+  const contrast = 1 + 0.5 * t;
+  const saturate = 1.3 * t * gazeColor;
+  return `invert(${inv}) contrast(${contrast}) saturate(${Math.max(saturate, 0.01)})`;
+}
+
+function getBgColor(t) {
+  const v = Math.round(t * 255);
+  return `rgb(${v},${v},${v})`;
+}
+
+FRAMES.forEach((f, i) => {
+  const img = new Image();
+  img.src = f.src;
+  img.draggable = false;
+  eyeCanvas.appendChild(img);
+  imgElements.push(img);
+  img.onload = () => {
+    img.style.left = (f.x - (img.naturalWidth * f.scale) / 2) + 'px';
+    img.style.top = (f.y - (img.naturalHeight * f.scale) / 2) + 'px';
+    img.style.width = (img.naturalWidth * f.scale) + 'px';
+    img.style.height = (img.naturalHeight * f.scale) + 'px';
+    if (i === 0) { showFrame(0); applyT(0); }
+  };
+});
+
+function showFrame(idx) {
+  imgElements.forEach((img, i) => {
+    img.style.display = i === idx ? 'block' : 'none';
+    if (i === idx) img.style.filter = getFilter(currentT);
+  });
+}
+
+function applyT(t) {
+  currentT = t;
+  document.body.style.background = getBgColor(t);
+  texCanvas.style.opacity = t;
+  imgElements.forEach((img) => {
+    if (img.style.display === 'block') img.style.filter = getFilter(t);
+  });
+}
+
+function updateColorFilter() {
+  imgElements.forEach((img) => {
+    if (img.style.display === 'block') img.style.filter = getFilter(currentT);
+  });
+}
+
+function playAnim() {
+  if (playing) return;
+  playing = true;
+  let frame = 0;
+  let bgStep = 0;
+  const totalBgSteps = (FRAMES.length - 1) * 2;
+  showFrame(frame);
+  applyT(0);
+
+  bgTimer = setInterval(() => {
+    bgStep++;
+    if (bgStep >= totalBgSteps) {
+      applyT(1);
+      clearInterval(bgTimer);
+      return;
+    }
+    applyT(bgStep / totalBgSteps);
+  }, 50);
+
+  animTimer = setInterval(() => {
+    frame++;
+    if (frame >= FRAMES.length - 1) {
+      showFrame(FRAMES.length - 1);
+      stopAnim();
+      return;
+    }
+    showFrame(frame);
+  }, 100);
+}
+
+function stopAnim() {
+  playing = false;
+  clearInterval(animTimer);
+  clearInterval(bgTimer);
+}
+
+// Mouse proximity -> color
+document.addEventListener('mousemove', (e) => {
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  const maxDist = Math.hypot(cx, cy);
+  const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
+  gazeColor = Math.max(0, 1 - dist / maxDist);
+  updateColorFilter();
+});
+
+document.addEventListener('click', () => {
+  if (playing) stopAnim(); else playAnim();
+});
+</script>
+</body>
+</html>
